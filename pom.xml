@@ -7,16 +7,10 @@
     <packaging>jar</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>24</maven.compiler.release>
+        <maven.compiler.release>17</maven.compiler.release>
         <exec.mainClass>eci.arep.juancancelado.mavenproject1.Mavenproject1</exec.mainClass>
     </properties>  
     <dependencies>
-        <!-- Librería Gson para serializar objetos a JSON -->
-        <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.10.1</version>
-        </dependency>
         
         <dependency>
         <groupId>org.junit.jupiter</groupId>

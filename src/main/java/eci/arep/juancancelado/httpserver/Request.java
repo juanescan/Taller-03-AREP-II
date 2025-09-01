@@ -2,7 +2,7 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
-package eci.arep.juancancelado.mavenproject1;
+package eci.arep.juancancelado.httpserver;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
