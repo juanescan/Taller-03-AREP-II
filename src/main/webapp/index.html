@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Agregador de Tareas</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Gestión de Tareas</h1>
+
+    <section>
+        <!-- Nombre de la tarea -->
+        <input type="text" id="taskName" placeholder="Escribe una tarea">
+
+        <!-- Selección del tipo -->
+        <select id="taskType">
+            <option value="casa">Casa</option>
+            <option value="universidad">Universidad</option>
+            <option value="trabajo">Trabajo</option>
+            <option value="otro">Otro</option>
+        </select>
+
+        <!-- Botón debajo del select -->
+        <br><br>
+        <button onclick="addTask()">Agregar</button>
+
+        <!-- Lista de tareas -->
+        <ul id="tasksList" class="response"></ul>
+    </section>
+
+    <script src="script.js"></script>
+</body>
+</html>
