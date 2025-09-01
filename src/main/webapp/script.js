@@ -1,32 +1,29 @@
-function addTask() {
-    let name = document.getElementById("taskName").value;
-    let type = document.getElementById("taskType").value;
-    fetch(`/tasks?name=${encodeURIComponent(name)}&type=${encodeURIComponent(type)}`, {method: 'POST'})
-        .then(r => r.text()).then(t => {
-            alert(t);
-            listTasks();
-        });
+async function addTask() {
+    const name = document.getElementById("taskName").value;
+    const type = document.getElementById("taskType").value;
+    await fetch(`/tasks?name=${encodeURIComponent(name)}&type=${encodeURIComponent(type)}`, {
+        method: "POST"
+    });
+    listTasks();
 }
 
-function listTasks() {
-    fetch("/tasks")
-        .then(r => r.json())
-        .then(data => {
-            let list = document.getElementById("tasksList");
-            list.innerHTML = "";
-            data.forEach(task => {
-                let li = document.createElement("li");
-                li.textContent = `${task.name} - ${task.type}`;
-                li.onclick = () => deleteTask(task.name, task.type);
-                list.appendChild(li);
-            });
-        });
+async function listTasks() {
+    const res = await fetch("/tasks");
+    const tasks = await res.json();
+    const list = document.getElementById("taskList");
+    list.innerHTML = "";
+    tasks.forEach(t => {
+        const li = document.createElement("li");
+        li.textContent = `${t.name} (${t.type})`;
+        list.appendChild(li);
+    });
 }
 
-function deleteTask(name, type) {
-    fetch(`/tasks?name=${encodeURIComponent(name)}&type=${encodeURIComponent(type)}`, {method: 'DELETE'})
-        .then(r => r.text()).then(t => {
-            alert(t);
-            listTasks();
-        });
+async function deleteTask(name, type) {
+    const res = await fetch(`/tasks?name=${encodeURIComponent(name)}&type=${encodeURIComponent(type)}`, {
+        method: "DELETE"
+    });
+    const msg = await res.text();
+    alert(msg);
+    listTasks();
 }
