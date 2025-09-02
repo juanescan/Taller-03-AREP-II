@@ -237,19 +237,20 @@ public class HttpServer {
 
   
     public static String toJson(List<Task> tasks) {
-        StringBuilder json = new StringBuilder("[");
-        for (int i = 0; i < tasks.size(); i++) {
-            Task task = tasks.get(i);
-            json.append("{")
-                    .append("\"name\": \"").append(task.getName()).append("\", ")
-                    .append("\"type\": \"").append(task.getType()).append("\", ")
-                    .append("}");
-            if (i < tasks.size() - 1) {
-                json.append(", ");
-            }
+    StringBuilder json = new StringBuilder("[");
+    for (int i = 0; i < tasks.size(); i++) {
+        Task task = tasks.get(i);
+        json.append("{")
+            .append("\"name\":\"").append(task.getName()).append("\",")
+            .append("\"type\":\"").append(task.getType()).append("\"")
+            .append("}");
+        if (i < tasks.size() - 1) {
+            json.append(",");
         }
-        json.append("]");
-        return json.toString();
     }
+    json.append("]");
+    return json.toString();
+}
+
 
 }
