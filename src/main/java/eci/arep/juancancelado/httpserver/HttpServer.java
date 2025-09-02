@@ -1,239 +1,255 @@
 package eci.arep.juancancelado.httpserver;
 
-import java.io.*;
+import eci.arep.juancancelado.clase.Task;
 import java.net.*;
+import java.io.*;
 import java.nio.file.Files;
-import java.util.*;
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiFunction;
 
-import java.io.IOException;
-
-import java.io.File;
 
 public class HttpServer {
+    private static final List<Task> tasks = new ArrayList<>();
 
-    private static final List<Map<String, String>> tasks = new ArrayList<>();
-    private static final Map<String, Route> getRoutes = new ConcurrentHashMap<>();
-    private static String staticDir = "src/main/webapp";
+    private static final Map<String, BiFunction<Request, Response, String>> getRoutes = new HashMap<>();
+    private static final Map<String, BiFunction<Request, Response, String>> postRoutes = new HashMap<>();
+    private static String staticDirectory = "src/main/webapp";
 
-    public static void staticfiles(String dir) {
-        staticDir = dir;
-    }
-
-    public static void get(String path, Route route) {
-        if (!path.startsWith("/")) {
-            path = "/" + path;
-        }
-        getRoutes.put(path, route);
-    }
-
-    public static void start(int port) throws IOException {
-        ServerSocket server = new ServerSocket(port);
-        System.out.println("Servidor en http://localhost:" + port);
-        while (true) {
-            Socket client = server.accept();
-            new Thread(() -> {
-                try {
-                    handle(client);
-                } catch (Exception ignored) {
-                } finally {
-                    try {
-                        client.close();
-                    } catch (IOException ignored) {
-                    }
-                }
-            }).start();
-        }
-    }
-
-    public static void main(String[] args) throws Exception {
+ 
+    public static void main(String[] args) {
         staticfiles("src/main/webapp");
 
-        get("/App/hello", (req, res) -> "Hello " + req.getValues("name"));
-        get("/App/pi", (req, res) -> String.valueOf(Math.PI));
+        get("/hello", (req, res) -> "Hello " + req.getValues("name"));
+        get("/pi", (req, res) -> String.valueOf(Math.PI));
+
+        get("/api/tasks", (req, res) -> {
+            if (tasks.isEmpty()) {
+                return "[]";
+            }
+            return toJson(tasks);
+        });
+
+        post("/api/tasks", (req, res) -> {
+            String body = req.getBody();
+            Map<String, String> data = parseJson(body);
+
+            if (data.containsKey("name") && data.containsKey("type") && data.containsKey("price")) {
+                try {
+                    tasks.add(new Task(data.get("name"), data.get("type")));
+                    return "{\"message\": \"Task added successfully\"}";
+                } catch (NumberFormatException e) {
+                    return "{\"error\": \"Invalid price format\"}";
+                }
+            }
+            return "{\"error\": \"Missing fields\"}";
+
+        });
 
         start(8080);
     }
 
-    private static void handle(Socket client) throws IOException {
-        BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-        OutputStream out = client.getOutputStream();
+    public static void get(String path, BiFunction<Request, Response, String> handler) {
+        getRoutes.put(path, handler);
+    }
 
-        String requestLine = in.readLine();
-        if (requestLine == null || requestLine.isEmpty()) {
-            return;
-        }
-        String[] parts = requestLine.split(" ");
-        String method = parts[0];
-        String rawPath = parts[1]; // Ej: "/App/hello?name=juan"
+    public static void post(String path, BiFunction<Request, Response, String> handler) {
+        postRoutes.put(path, handler);
+    }
 
-        // separar path y query string
-        String pathOnly = rawPath.split("\\?")[0]; // "/App/hello"
+    public static void staticfiles(String path) {
+        staticDirectory = path;
+        System.out.println("Archivos estáticos servidos desde: " + new File(staticDirectory).getAbsolutePath());
+    }
+    
+    public static void start(int port) {
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            System.out.println("Servidor en ejecución en el puerto " + port);
 
-        // ignorar headers
-        while ((in.readLine()) != null && !in.ready()) {
-        }
-
-        Request req = new Request(method, rawPath);
-        Response res = new Response();
-
-        // 1) si hay ruta definida
-        Route route = getRoutes.get(pathOnly);
-        if (route != null) {
-            try {
-                String body = route.handle(req, res);
-                sendText(out, res.status, res.type, body);
-            } catch (Exception e) {
-                sendText(out, 500, "text/plain", "Error: " + e.getMessage());
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                handleRequest(clientSocket);
             }
-            return;
+        } catch (IOException e) {
+            System.err.println("Error al iniciar el servidor");
+            System.exit(1);
         }
+    }
 
-        // 2) endpoint especial de tareas
-        if (pathOnly.startsWith("/tasks")|| pathOnly.startsWith("/api/tasks")) {
-            handleTasks(out, method, req);
-            return;
-        }
+    private static void handleRequest(Socket clientSocket) {
+        try (
+                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                OutputStream out = clientSocket.getOutputStream()
+        ) {
+            String requestLine = in.readLine();
+            if (requestLine == null) return;
 
-        if (method.equals("GET")) {
-            route = getRoutes.get(pathOnly);
-        } else if (method.equals("POST")) {
-            route = postRoutes.get(pathOnly);
-        }
+            System.out.println("Solicitud: " + requestLine);
+            String[] requestParts = requestLine.split(" ");
+            if (requestParts.length < 2) return;
 
-        if (route != null) {
-            try {
-                String body = route.handle(req, res);
-                sendText(out, res.status, res.type, body);
-            } catch (Exception e) {
-                sendText(out, 500, "text/plain", "Error: " + e.getMessage());
+            String method = requestParts[0];
+            String fullPath = requestParts[1];
+            String path = fullPath.split("\\?")[0];
+            Map<String, String> queryParams = getQueryParams(fullPath);
+
+            Request req = new Request(method, path, queryParams);
+            Response res = new Response();
+
+            // 🔹 Si la ruta está definida en el hashmap `routes`
+            if (method.equals("GET") && getRoutes.containsKey(path)) {
+                String responseBody = getRoutes.get(path).apply(req, res);
+                sendResponse(out, 200, "application/json", responseBody);
+            } else if (method.equals("POST") && postRoutes.containsKey(path)) {
+                String body = readRequestBody(in);
+                req.setBody(body);
+                String responseBody = postRoutes.get(path).apply(req, res);
+                sendResponse(out, 201, "application/json", responseBody);
             }
-            return;
-        }
-
-        serveStatic(out, pathOnly);
-    }
-
-    private static void serveStatic(OutputStream out, String rawPath) throws IOException {
-        String path = rawPath.equals("/") ? "/index.html" : rawPath;
-        File file = new File(staticDir + path);
-        if (file.exists() && file.isFile()) {
-            byte[] data = Files.readAllBytes(file.toPath());
-            sendBinary(out, 200, guessContentType(path), data);
-        } else {
-            sendText(out, 404, "text/plain", "404 Not Found: " + path);
-        }
-    }
-
-    private static void handleTasks(OutputStream out, String method, Request req) throws IOException {
-        String name = req.getValues("name");
-        String type = req.getValues("type");
-
-        switch (method) {
-            case "GET":
-                sendText(out, 200, "application/json", tasksToJson());
-                break;
-            case "POST":
-                if (!name.isEmpty()) {
-                    Map<String, String> t = new HashMap<>();
-                    t.put("name", name);
-                    t.put("type", type.isEmpty() ? "otro" : type);
-                    tasks.add(t);
-                    sendText(out, 200, "text/plain", "Tarea agregada: " + name);
-                } else {
-                    sendText(out, 400, "text/plain", "Nombre requerido");
-                }
-                break;
-            case "DELETE":
-                boolean removed = tasks.removeIf(t -> t.get("name").equals(name) && t.get("type").equals(type));
-                sendText(out, 200, "text/plain", removed ? "Tarea eliminada" : "No encontrada");
-                break;
-            case "RESET":
-                tasks.clear();
-                sendText(out, 200, "text/plain", "Lista reiniciada");
-                break;
-            default:
-                sendText(out, 405, "text/plain", "Método no soportado");
-        }
-    }
-
-    // Método para convertir la lista de tareas a JSON
-    private static String tasksToJson() {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < tasks.size(); i++) {
-            Map<String, String> task = tasks.get(i);
-            sb.append("{");
-            sb.append("\"name\":\"").append(task.get("name")).append("\",");
-            sb.append("\"type\":\"").append(task.get("type")).append("\"");
-            sb.append("}");
-            if (i < tasks.size() - 1) {
-                sb.append(",");
+            else {
+                System.out.println("Buscando archivo estático en: " + staticDirectory + path);
+                serveStaticFile(path, out);
             }
-        }
-        sb.append("]");
-        return sb.toString();
-    }
 
-    private static void sendText(OutputStream out, int status, String type, String body) throws IOException {
-        byte[] data = body.getBytes(StandardCharsets.UTF_8);
-        String headers = "HTTP/1.1 " + status + " OK\r\n"
-                + "Content-Type: " + type + "; charset=utf-8\r\n"
-                + "Content-Length: " + data.length + "\r\n\r\n";
-        out.write(headers.getBytes());
-        out.write(data);
-    }
-
-    private static void sendBinary(OutputStream out, int status, String type, byte[] data) throws IOException {
-        String headers = "HTTP/1.1 " + status + " OK\r\n"
-                + "Content-Type: " + type + "\r\n"
-                + "Content-Length: " + data.length + "\r\n\r\n";
-        out.write(headers.getBytes());
-        out.write(data);
-    }
-
-    private static String guessContentType(String name) {
-        if (name.endsWith(".html")) {
-            return "text/html";
-        }
-        if (name.endsWith(".css")) {
-            return "text/css";
-        }
-        if (name.endsWith(".js")) {
-            return "application/javascript";
-        }
-        if (name.endsWith(".png")) {
-            return "image/png";
-        }
-        if (name.endsWith(".jpg")) {
-            return "image/jpeg";
-        }
-        return "application/octet-stream";
-    }
-
-    public static void runServer(String[] args) {
-        try {
-            staticfiles("src/main/webapp");
-            if (args.length < 1) {
-                System.err.println("Uso: java -cp target/classes eci.arep.juancancelado.microspringboot.MicroSpringBoot <FQNControlador>");
-                return;
-            }
-            String controllerFqn = args[0];
-            Class<?> clazz = Class.forName(controllerFqn);
-            eci.arep.juancancelado.microspringboot.MicroSpringBoot.registerController(clazz);
-            start(8080);
-        } catch (Exception e) {
+            clientSocket.close();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private static final Map<String, Route> postRoutes = new ConcurrentHashMap<>();
+    private static String readRequestBody(BufferedReader in) throws IOException {
+        StringBuilder body = new StringBuilder();
+        int contentLength = 0;
 
-    public static void post(String path, Route route) {
-        if (!path.startsWith("/")) {
-            path = "/" + path;
+        String line;
+        while ((line = in.readLine()) != null && !line.isEmpty()) {
+            if (line.startsWith("Content-Length:")) {
+                contentLength = Integer.parseInt(line.substring(15).trim());
+            }
         }
-        postRoutes.put(path, route);
+
+        if (contentLength > 0) {
+            char[] buffer = new char[contentLength];
+            in.read(buffer, 0, contentLength);
+            body.append(buffer);
+        }
+
+        String jsonBody = body.toString();
+        System.out.println("JSON Recibido: " + jsonBody);
+        return jsonBody;
+    }
+
+
+    private static Map<String, String> getQueryParams(String fullPath) {
+        Map<String, String> queryParams = new HashMap<>();
+        if (fullPath.contains("?")) {
+            String queryString = fullPath.split("\\?")[1];
+            String[] params = queryString.split("&");
+
+            for (String param : params) {
+                String[] keyValue = param.split("=");
+                if (keyValue.length == 2) {
+                    queryParams.put(keyValue[0], keyValue[1]);
+                }
+            }
+        }
+        return queryParams;
+    }
+
+    private static void serveStaticFile(String path, OutputStream out) throws IOException {
+        if (path.equals("/")) path = "/index.html";
+        File file = new File("src/main/webapp" + path);
+        if (file.exists() && !file.isDirectory()) {
+            String contentType = getContentType(path);
+            byte[] fileBytes = Files.readAllBytes(file.toPath());
+            out.write(("HTTP/1.1 200 OK\r\nContent-Type: " + contentType + "\r\n\r\n").getBytes());
+            out.write(fileBytes);
+        } else {
+            out.write("HTTP/1.1 404 Not Found\r\n\r\n".getBytes());
+        }
+    }
+
+    private static void sendResponse(OutputStream out, int statusCode, String contentType, String body) throws IOException {
+        String statusLine = "HTTP/1.1 " + statusCode + " " + getStatusMessage(statusCode) + "\r\n";
+        String headers = "Content-Type: " + contentType + "\r\n" +
+                "Content-Length: " + body.length() + "\r\n" +
+                "Connection: close\r\n\r\n";
+
+        out.write((statusLine + headers + body).getBytes());
+        out.flush();
+    }
+
+    private static String getStatusMessage(int statusCode) {
+        return switch (statusCode) {
+            case 200 -> "OK";
+            case 201 -> "Created";
+            case 400 -> "Bad Request";
+            case 404 -> "Not Found";
+            case 405 -> "Method Not Allowed";
+            case 500 -> "Internal Server Error";
+            default -> "Unknown Status";
+        };
+    }
+
+    private static String getContentType(String path) {
+        if (path.endsWith(".html")) return "text/html";
+        if (path.endsWith(".css")) return "text/css";
+        if (path.endsWith(".js")) return "application/javascript";
+        if (path.endsWith(".png")) return "image/png";
+        if (path.endsWith(".jpeg") || path.endsWith(".jpg")) return "image/jpeg";
+        if (path.endsWith(".gif")) return "image/gif";
+        if (path.endsWith(".svg")) return "image/svg+xml";
+        if (path.endsWith(".ico")) return "image/x-icon";
+        return "application/octet-stream";
+    }
+
+    
+    public static Map<String, String> parseJson(String json) {
+        Map<String, String> map = new HashMap<>();
+
+        if (json == null || json.isEmpty()) {
+            return map;
+        }
+
+        json = json.trim();
+
+        if (json.startsWith("{") && json.endsWith("}")) {
+            json = json.substring(1, json.length() - 1);
+        } else {
+            return map; 
+        }
+
+        String[] pairs = json.split(",");
+
+        for (String pair : pairs) {
+            String[] keyValue = pair.split(":", 2);
+            if (keyValue.length == 2) {
+                String key = keyValue[0].trim().replace("\"", "");
+                String value = keyValue[1].trim().replace("\"", "");
+                map.put(key, value);
+            }
+        }
+        return map;
+    }
+
+
+  
+    public static String toJson(List<Task> tasks) {
+        StringBuilder json = new StringBuilder("[");
+        for (int i = 0; i < tasks.size(); i++) {
+            Task task = tasks.get(i);
+            json.append("{")
+                    .append("\"name\": \"").append(task.getName()).append("\", ")
+                    .append("\"type\": \"").append(task.getType()).append("\", ")
+                    .append("}");
+            if (i < tasks.size() - 1) {
+                json.append(", ");
+            }
+        }
+        json.append("]");
+        return json.toString();
     }
 
 }

@@ -8,15 +8,26 @@ package eci.arep.juancancelado.clase;
  *
  * @author juane
  */
- public class Task {
-        private String name;
-        private String type;
+public class Task {
 
-        public Task(String name, String type) {
-            this.name = name;
-            this.type = type;
-        }
+    private String name;
+    private String type;
 
-        public String getName() { return name; }
-        public String getType() { return type; }
+    public Task(String name, String type) {
+        this.name = name;
+        this.type = type;
     }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    @Override
+    public String toString() {
+        return "{\"name\":\"" + name + "\", \"type\":\"" + type + "}";
+    }
+}

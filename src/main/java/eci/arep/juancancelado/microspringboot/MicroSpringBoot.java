@@ -4,108 +4,128 @@
  */
 package eci.arep.juancancelado.microspringboot;
 
+import eci.arep.juancancelado.clase.Task;
 import eci.arep.juancancelado.httpserver.HttpServer;
 import eci.arep.juancancelado.httpserver.Request;
-import eci.arep.juancancelado.httpserver.Response;
-import eci.arep.juancancelado.httpserver.Route;
 import eci.arep.juancancelado.microspringboot.annotations.GetMapping;
 import eci.arep.juancancelado.microspringboot.annotations.PostMapping;
+import eci.arep.juancancelado.microspringboot.annotations.RequestBody;
 import eci.arep.juancancelado.microspringboot.annotations.RequestParam;
 import eci.arep.juancancelado.microspringboot.annotations.RestController;
-import java.io.IOException;
-import java.lang.annotation.Annotation;
+import eci.arep.juancancelado.microspringboot.examples.GreetingController;
+import eci.arep.juancancelado.microspringboot.examples.TaskController;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.net.URISyntaxException;
+import java.util.List;
+import java.util.Map;
 
-/**
- *
- * @author juane
- */
+
 public class MicroSpringBoot {
 
     public static void main(String[] args) {
-        System.out.println("Starting MicroSpringBoot!");
-        HttpServer.runServer(args);
+        System.out.println("Iniciando MicroSpringBoot...");
+        loadControllers();
+        HttpServer.staticfiles("src/main/webapp");
+        HttpServer.start(8080);
+        System.out.println("El servidor está corriendo en http://localhost:8080");
     }
 
-    /**
-     * Registra controladores con @RestController y métodos @GetMapping.
-     */
-    public static void registerController(Class<?> clazz) throws Exception {
-    if (!clazz.isAnnotationPresent(RestController.class)) {
-        System.out.println("Clase " + clazz.getName() + " no tiene @RestController.");
-        return;
+    private static void loadControllers() {
+        registerController(new GreetingController()); // http://localhost:8080/greeting?name=Juan
+        registerController(new TaskController());     // http://localhost:8080/api/tasks
     }
 
-    Object controller = clazz.getDeclaredConstructor().newInstance();
-
-    for (Method m : clazz.getDeclaredMethods()) {
-        String path = null;
-        boolean isGet = false, isPost = false;
-
-        if (m.isAnnotationPresent(GetMapping.class)) {
-            path = m.getAnnotation(GetMapping.class).value();
-            isGet = true;
-        } else if (m.isAnnotationPresent(PostMapping.class)) {
-            path = m.getAnnotation(PostMapping.class).value();
-            isPost = true;
+    private static void registerController(Object controllerInstance) {
+        Class<?> beanClass = controllerInstance.getClass();
+        if (!beanClass.isAnnotationPresent(RestController.class)) {
+            System.err.println("La clase " + beanClass.getName() + " no está anotada con @RestController.");
+            return;
         }
 
-        if (path == null) continue;
-        if (!path.startsWith("/")) path = "/" + path;
-        final String finalPath = path;
-
-        Route route = (Request req, Response res) -> {
-            Parameter[] params = m.getParameters();
-            Object[] args = new Object[params.length];
-
-            for (int i = 0; i < params.length; i++) {
-                RequestParam rp = getRequestParam(params[i].getAnnotations());
-                String raw = req.getValues(rp.value());
-                if (raw.isEmpty()) raw = rp.defaultValue();
-                args[i] = coerce(raw, params[i].getType());
+        Method[] methods = beanClass.getDeclaredMethods();
+        for (Method m : methods) {
+            if (m.isAnnotationPresent(GetMapping.class)) {
+                GetMapping mapping = m.getAnnotation(GetMapping.class);
+                String path = mapping.value();
+                HttpServer.get(path, (req, res) -> {
+                    try {
+                        return invokeMethod(m, controllerInstance, req);
+                    } catch (InvocationTargetException ex) {
+                        ex.printStackTrace();
+                        return "{\"error\":\"Internal Server Error\"}";
+                    }
+                });
             }
-
-            Object result = m.invoke(controller, args);
-            return result == null ? "" : result.toString();
-        };
-
-        if (isGet) {
-            HttpServer.get(finalPath, route);
-            System.out.println("Ruta registrada: GET " + finalPath);
-        }
-        if (isPost) {
-            HttpServer.post(finalPath, route);
-            System.out.println("Ruta registrada: POST " + finalPath);
-        }
-    }
-}
-
-
-    private static RequestParam getRequestParam(Annotation[] anns) {
-        for (Annotation a : anns) {
-            if (a instanceof RequestParam) {
-                return (RequestParam) a;
+            if (m.isAnnotationPresent(PostMapping.class)) {
+                PostMapping mapping = m.getAnnotation(PostMapping.class);
+                String path = mapping.value();
+                HttpServer.post(path, (req, res) -> {
+                    try {
+                        return invokeMethod(m, controllerInstance, req);
+                    } catch (InvocationTargetException ex) {
+                        ex.printStackTrace();
+                        return "{\"error\":\"Internal Server Error\"}";
+                    }
+                });
             }
         }
-        return null;
     }
 
-    private static Object coerce(String raw, Class<?> type) {
-        if (type == String.class) {
-            return raw;
+    private static String invokeMethod(Method method, Object instance, Request req) throws InvocationTargetException {
+        try {
+            Parameter[] parameters = method.getParameters();
+            Object[] argsForMethod = new Object[parameters.length];
+
+            for (int i = 0; i < parameters.length; i++) {
+                Parameter parameter = parameters[i];
+                if (parameter.isAnnotationPresent(RequestBody.class)) {
+                    if (Map.class.isAssignableFrom(parameter.getType())) {
+                        argsForMethod[i] = HttpServer.parseJson(req.getBody());
+                    } else {
+                        argsForMethod[i] = req.getBody();
+                    }
+                } else if (parameter.isAnnotationPresent(RequestParam.class)) {
+                    RequestParam reqParam = parameter.getAnnotation(RequestParam.class);
+                    String paramName = reqParam.value();
+                    String value = req.getQueryParams().get(paramName);
+                    if (value == null || value.isEmpty()) {
+                        value = reqParam.defaultValue();
+                    }
+                    argsForMethod[i] = value;
+                } else {
+                    argsForMethod[i] = null;
+                }
+            }
+
+            Object result = method.invoke(instance, argsForMethod);
+
+            // 🔹 Serializar listas de Task como JSON
+            if (result instanceof List<?>) {
+                List<?> list = (List<?>) result;
+                if (!list.isEmpty() && list.get(0) instanceof Task) {
+                    return HttpServer.toJson((List<Task>) list);
+                }
+            }
+
+            // 🔹 Map como JSON simple
+            if (result instanceof Map<?, ?>) {
+                StringBuilder sb = new StringBuilder("{");
+                Map<?, ?> map = (Map<?, ?>) result;
+                int count = 0;
+                for (var entry : map.entrySet()) {
+                    sb.append("\"").append(entry.getKey()).append("\":\"").append(entry.getValue()).append("\"");
+                    if (++count < map.size()) sb.append(",");
+                }
+                sb.append("}");
+                return sb.toString();
+            }
+
+            return result != null ? result.toString() : "";
+
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            e.printStackTrace();
+            return "{\"error\": \"Internal Server Error\"}";
         }
-        if (type == int.class || type == Integer.class) {
-            return raw.isEmpty() ? 0 : Integer.parseInt(raw);
-        }
-        if (type == long.class || type == Long.class) {
-            return raw.isEmpty() ? 0L : Long.parseLong(raw);
-        }
-        if (type == double.class || type == Double.class) {
-            return raw.isEmpty() ? 0.0 : Double.parseDouble(raw);
-        }
-        return raw;
     }
 }
