@@ -62,6 +62,43 @@ El sistema está compuesto por tres capas principales:
   "type": "Universidad"
 }
 
+## Estructura
+
+```
+src/
+  main/
+    java/
+      eci/
+        arep/
+         juancancelado/ 
+            httpserver/
+                HttpServer.java
+                Request.java
+                Response.java
+                Route.java
+            microspringboot/
+                annotations/
+                    GetMapping.java
+                    PostMapping.java
+                    RequestBody.java
+                    RequestParam.java
+                    RestController.java
+                examples/
+                    GreetingController.java
+                    TaskController.java
+            model/
+                Task.java
+    webapp/
+        fondo.png
+        index.html
+        script.js
+        style.css
+  test/  
+
+## Test
+
+![Test](/imagenes/testT3.png)
+
 ## APP
 
 ![App](/imagenes/APP1.png)

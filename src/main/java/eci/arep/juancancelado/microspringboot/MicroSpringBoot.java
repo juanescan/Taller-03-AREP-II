@@ -72,7 +72,7 @@ public class MicroSpringBoot {
         }
     }
 
-    private static String invokeMethod(Method method, Object instance, Request req) throws InvocationTargetException {
+    public static String invokeMethod(Method method, Object instance, Request req) throws InvocationTargetException {
         try {
             Parameter[] parameters = method.getParameters();
             Object[] argsForMethod = new Object[parameters.length];

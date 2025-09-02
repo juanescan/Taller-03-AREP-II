@@ -10,15 +10,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 
-
 public class HttpServer {
+
     private static final List<Task> tasks = new ArrayList<>();
 
     private static final Map<String, BiFunction<Request, Response, String>> getRoutes = new HashMap<>();
     private static final Map<String, BiFunction<Request, Response, String>> postRoutes = new HashMap<>();
     private static String staticDirectory = "src/main/webapp";
 
- 
     public static void main(String[] args) {
         staticfiles("src/main/webapp");
 
@@ -63,7 +62,7 @@ public class HttpServer {
         staticDirectory = path;
         System.out.println("Archivos estáticos servidos desde: " + new File(staticDirectory).getAbsolutePath());
     }
-    
+
     public static void start(int port) {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Servidor en ejecución en el puerto " + port);
@@ -80,15 +79,17 @@ public class HttpServer {
 
     private static void handleRequest(Socket clientSocket) {
         try (
-                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                OutputStream out = clientSocket.getOutputStream()
-        ) {
+                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); OutputStream out = clientSocket.getOutputStream()) {
             String requestLine = in.readLine();
-            if (requestLine == null) return;
+            if (requestLine == null) {
+                return;
+            }
 
             System.out.println("Solicitud: " + requestLine);
             String[] requestParts = requestLine.split(" ");
-            if (requestParts.length < 2) return;
+            if (requestParts.length < 2) {
+                return;
+            }
 
             String method = requestParts[0];
             String fullPath = requestParts[1];
@@ -107,8 +108,7 @@ public class HttpServer {
                 req.setBody(body);
                 String responseBody = postRoutes.get(path).apply(req, res);
                 sendResponse(out, 201, "application/json", responseBody);
-            }
-            else {
+            } else {
                 System.out.println("Buscando archivo estático en: " + staticDirectory + path);
                 serveStaticFile(path, out);
             }
@@ -141,7 +141,6 @@ public class HttpServer {
         return jsonBody;
     }
 
-
     private static Map<String, String> getQueryParams(String fullPath) {
         Map<String, String> queryParams = new HashMap<>();
         if (fullPath.contains("?")) {
@@ -159,7 +158,9 @@ public class HttpServer {
     }
 
     private static void serveStaticFile(String path, OutputStream out) throws IOException {
-        if (path.equals("/")) path = "/index.html";
+        if (path.equals("/")) {
+            path = "/index.html";
+        }
         File file = new File("src/main/webapp" + path);
         if (file.exists() && !file.isDirectory()) {
             String contentType = getContentType(path);
@@ -173,9 +174,9 @@ public class HttpServer {
 
     private static void sendResponse(OutputStream out, int statusCode, String contentType, String body) throws IOException {
         String statusLine = "HTTP/1.1 " + statusCode + " " + getStatusMessage(statusCode) + "\r\n";
-        String headers = "Content-Type: " + contentType + "\r\n" +
-                "Content-Length: " + body.length() + "\r\n" +
-                "Connection: close\r\n\r\n";
+        String headers = "Content-Type: " + contentType + "\r\n"
+                + "Content-Length: " + body.length() + "\r\n"
+                + "Connection: close\r\n\r\n";
 
         out.write((statusLine + headers + body).getBytes());
         out.flush();
@@ -183,29 +184,51 @@ public class HttpServer {
 
     private static String getStatusMessage(int statusCode) {
         return switch (statusCode) {
-            case 200 -> "OK";
-            case 201 -> "Created";
-            case 400 -> "Bad Request";
-            case 404 -> "Not Found";
-            case 405 -> "Method Not Allowed";
-            case 500 -> "Internal Server Error";
-            default -> "Unknown Status";
+            case 200 ->
+                "OK";
+            case 201 ->
+                "Created";
+            case 400 ->
+                "Bad Request";
+            case 404 ->
+                "Not Found";
+            case 405 ->
+                "Method Not Allowed";
+            case 500 ->
+                "Internal Server Error";
+            default ->
+                "Unknown Status";
         };
     }
 
     private static String getContentType(String path) {
-        if (path.endsWith(".html")) return "text/html";
-        if (path.endsWith(".css")) return "text/css";
-        if (path.endsWith(".js")) return "application/javascript";
-        if (path.endsWith(".png")) return "image/png";
-        if (path.endsWith(".jpeg") || path.endsWith(".jpg")) return "image/jpeg";
-        if (path.endsWith(".gif")) return "image/gif";
-        if (path.endsWith(".svg")) return "image/svg+xml";
-        if (path.endsWith(".ico")) return "image/x-icon";
+        if (path.endsWith(".html")) {
+            return "text/html";
+        }
+        if (path.endsWith(".css")) {
+            return "text/css";
+        }
+        if (path.endsWith(".js")) {
+            return "application/javascript";
+        }
+        if (path.endsWith(".png")) {
+            return "image/png";
+        }
+        if (path.endsWith(".jpeg") || path.endsWith(".jpg")) {
+            return "image/jpeg";
+        }
+        if (path.endsWith(".gif")) {
+            return "image/gif";
+        }
+        if (path.endsWith(".svg")) {
+            return "image/svg+xml";
+        }
+        if (path.endsWith(".ico")) {
+            return "image/x-icon";
+        }
         return "application/octet-stream";
     }
 
-    
     public static Map<String, String> parseJson(String json) {
         Map<String, String> map = new HashMap<>();
 
@@ -218,7 +241,7 @@ public class HttpServer {
         if (json.startsWith("{") && json.endsWith("}")) {
             json = json.substring(1, json.length() - 1);
         } else {
-            return map; 
+            return map;
         }
 
         String[] pairs = json.split(",");
@@ -234,23 +257,41 @@ public class HttpServer {
         return map;
     }
 
-
-  
     public static String toJson(List<Task> tasks) {
-    StringBuilder json = new StringBuilder("[");
-    for (int i = 0; i < tasks.size(); i++) {
-        Task task = tasks.get(i);
-        json.append("{")
-            .append("\"name\":\"").append(task.getName()).append("\",")
-            .append("\"type\":\"").append(task.getType()).append("\"")
-            .append("}");
-        if (i < tasks.size() - 1) {
-            json.append(",");
+        StringBuilder json = new StringBuilder("[");
+        for (int i = 0; i < tasks.size(); i++) {
+            Task task = tasks.get(i);
+            json.append("{")
+                    .append("\"name\":\"").append(task.getName()).append("\",")
+                    .append("\"type\":\"").append(task.getType()).append("\"")
+                    .append("}");
+            if (i < tasks.size() - 1) {
+                json.append(",");
+            }
         }
+        json.append("]");
+        return json.toString();
     }
-    json.append("]");
-    return json.toString();
-}
 
+    // Dentro de HttpServer
+    public static List<Task> getTasks() {
+        return tasks;
+    }
+
+    public static void addTask(Task task) {
+        tasks.add(task);
+    }
+
+    public static void clearTasks() {
+        tasks.clear();
+    }
+
+    public static Map<String, BiFunction<Request, Response, String>> getRoutes() {
+        return getRoutes;
+    }
+
+    public static Map<String, BiFunction<Request, Response, String>> postRoutes() {
+        return postRoutes;
+    }
 
 }
