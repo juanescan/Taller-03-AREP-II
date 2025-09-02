@@ -15,8 +15,8 @@ La aplicación permite:
 
 1. Clona este repositorio o descarga los archivos:  
    ```bash
-   git clone https://github.com/juanescan/Taller-03-AREP.git
-   cd Taller-03-AREP
+   git clone https://github.com/juanescan/Taller-03-AREP-II.git
+   cd Taller-03-AREP-II
 
 2. Compila el proyecto con Maven:
     ```bash
