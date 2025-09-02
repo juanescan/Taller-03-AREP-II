@@ -31,3 +31,13 @@ La aplicación permite:
 El servidor se ejecutará en el puerto 8080:
 
 👉 http://localhost:8080
+
+
+## 🏗️ Arquitectura
+
+El sistema está compuesto por tres capas principales:
+
+1. MicroSpringBoot (Framework casero)
+    - Levanta un servidor HTTP sobre ServerSocket.
+    - Soporta anotaciones para definir controladores REST (@RestController, @GetMapping, @PostMapping, @RequestBody).
+    - Expone servicios configurados en clases como TaskController.
