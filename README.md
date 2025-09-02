@@ -41,3 +41,48 @@ El sistema está compuesto por tres capas principales:
     - Levanta un servidor HTTP sobre ServerSocket.
     - Soporta anotaciones para definir controladores REST (@RestController, @GetMapping, @PostMapping, @RequestBody).
     - Expone servicios configurados en clases como TaskController.
+
+2. Servidor HTTP
+    - Sirve archivos estáticos desde la carpeta src/main/webapp.
+    - Procesa solicitudes GET y POST registradas en los controladores.
+    - Serializa objetos Task a formato JSON.
+
+3. Aplicación Web (Frontend)
+    - index.html: interfaz gráfica para gestionar tareas.
+    - script.js: comunicación con el servidor usando fetch().
+    - La lista de tareas se actualiza dinámicamente sin recargar la página.
+
+## API REST
+
+- GET /api/tasks → Listar tareas en JSON.
+- POST /api/tasks → Agregar tarea enviando JSON:
+
+{
+  "name": "Estudiar AREP",
+  "type": "Universidad"
+}
+
+## APP
+
+![App](/imagenes/APP1.png)
+
+![App](/imagenes/APP2.png)
+
+![App](/imagenes/APP3.png)
+
+![App](/imagenes/APP4.png) 
+
+![App](/imagenes/APP5.png) 
+
+![App](/imagenes/APP6.png)
+
+![App](/imagenes/APP7.png)
+
+## Built With
+
+- Java SE - Lenguaje de programación
+
+- Maven - Herramienta de gestión de dependencias y construcción
+
+## Authors 
+- Juan Esteban Cancelado Sanchez - *AREP* *Taller 1* - [juanescan](https://github.com/juanescan)

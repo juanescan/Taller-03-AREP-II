@@ -4,7 +4,7 @@
  */
 package eci.arep.juancancelado.microspringboot;
 
-import eci.arep.juancancelado.clase.Task;
+import eci.arep.juancancelado.model.Task;
 import eci.arep.juancancelado.httpserver.HttpServer;
 import eci.arep.juancancelado.httpserver.Request;
 import eci.arep.juancancelado.microspringboot.annotations.GetMapping;

@@ -1,6 +1,6 @@
 package eci.arep.juancancelado.httpserver;
 
-import eci.arep.juancancelado.clase.Task;
+import eci.arep.juancancelado.model.Task;
 import java.net.*;
 import java.io.*;
 import java.nio.file.Files;
